@@ -1,33 +1,32 @@
 'use client'
 
-import React, { useState, useEffect, memo, useRef } from "react";
-import { useTranslations } from 'next-intl';
+import { InfoTip } from "@/components/tips/info";
 import {
-    Divider,
-    Switch,
+    api_get_engine_config,
+    api_get_engine_default,
+    api_get_engine_list,
+    api_tts_get_voice
+} from '@/lib/api/server';
+import { CHAT_MODE, ENGINE_TYPE, EngineDesc, EngineParamDesc, IFER_TYPE } from '@/lib/protocol';
+import {
+    useChatRecordStore,
+    useSentioAgentStore,
+    useSentioAsrStore,
+    useSentioChatModeStore,
+    useSentioTtsStore
+} from "@/lib/store/sentio";
+import {
     Autocomplete,
     AutocompleteItem,
+    Card, CardBody,
+    Divider,
     Link,
     Skeleton,
-    addToast
+    Switch
 } from "@heroui/react";
-import { Card, CardBody } from "@heroui/react";
-import { 
-    api_get_engine_list, 
-    api_get_engine_default, 
-    api_get_engine_config, 
-    api_tts_get_voice 
-} from '@/lib/api/server';
-import { ENGINE_TYPE, EngineParamDesc, EngineDesc, IFER_TYPE, CHAT_MODE } from '@/lib/protocol';
-import {
-    useSentioAsrStore,
-    useSentioTtsStore,
-    useSentioAgentStore,
-    useChatRecordStore,
-    useSentioChatModeStore
-} from "@/lib/store/sentio";
-import { InfoTip } from "@/components/tips/info";
-import {ParamsLoading, ParamsList} from "./params";
+import { useTranslations } from 'next-intl';
+import { memo, useEffect, useRef, useState } from "react";
+import { ParamsList, ParamsLoading } from "./params";
 
 const EngineSelector = memo(({
     engine,
@@ -127,15 +126,17 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
             if (engineType == ENGINE_TYPE.TTS && 'voice' in newSettings) {
                 console.log('set voice', settings)
                 api_tts_get_voice(engine, settings).then((voices) => {
-                    // 填充声音列表
                     for (var id in params) {
                         let param = params[id];
                         if (param.name == 'voice') {
-                            param.choices = voices.map((voice) => voice.name);
+                            param.choices = voices.map((voice) => voice.display_name || voice.name);
+                            (param as any)._voiceIdMap = voices.reduce((map: {[key: string]: string}, voice) => {
+                                map[voice.display_name || voice.name] = voice.name;
+                                return map;
+                            }, {});
                             break;
                         }
                     }
-                    // 更新语音列表
                     engineParams.current = params;
                     setIsLoadingEngineParams(false);
                 })
@@ -146,17 +147,28 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
     };
 
     const onEngineChange = (e: string | null) => {
-        // 切换引擎
-        if (e == null) {
-            return;
-        }
-        setIsLoadingEngineParams(true);
-        clearChatRecord();
-        engineParams.current = [];
-        setEngine(e);
-        setInferType(engineList.current[e].infer_type as IFER_TYPE);
-        getEngineParams(engineType, e);
-    };
+        // 切换引擎
+        if (e == null) {
+            return;
+        }
+
+        // 👇 🌟 新增的安全拦截：检查引擎是否存在于列表中
+        const targetEngine = engineList.current[e];
+        if (!targetEngine) {
+            console.warn(`警告: 列表中找不到名为 ${e} 的引擎数据`);
+            return; // 如果找不到，直接退出，防止后面代码崩溃
+        }
+        // 👆 🌟 新增结束
+
+        setIsLoadingEngineParams(true);
+        clearChatRecord();
+        engineParams.current = [];
+        setEngine(e);
+       
+        // 现在 targetEngine 必定存在，可以安全读取 infer_type 了
+        setInferType(targetEngine.infer_type as IFER_TYPE);
+        getEngineParams(engineType, e);
+    };
 
     useEffect(() => {
         // 获取引擎列表
@@ -165,14 +177,14 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
                 if (chatMode == CHAT_MODE.IMMSERSIVE) {
                     return true;
                 } else {
-                    return engine.infer_type == IFER_TYPE.NORMAL;
+                    return engine.infer_type == IFER_TYPE.NORMAL || engine.infer_type == IFER_TYPE.STREAM;
                 }
             })
             engineList.current = filterEngines.reduce((el: { [key: string]: EngineDesc }, engine) => {
                 el[engine.name] = engine;
                 return el;
             }, {});
-            
+
             setIsLoadingEngineList(false);
 
             const names = filterEngines.map((engine) => engine.name);
@@ -181,7 +193,7 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
                 setIsLoadingEngineParams(true);
                 engineParams.current = [];
                 setEngine(engine);
-                setInferType(engineList.current[engine].infer_type as IFER_TYPE);
+                setInferType(engineList.current[engine]?.infer_type as IFER_TYPE);
                 getEngineParams(engineType, engine);
             } else {
                 // 不存在时获取默认引擎
@@ -212,8 +224,8 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
         <Card>
             <CardBody className="p-4">
                 <div className="flex flex-col gap-4">
-                    <EnineEnable 
-                        show={engineType != ENGINE_TYPE.AGENT} 
+                    <EnineEnable
+                        show={engineType != ENGINE_TYPE.AGENT}
                         onSelect={(onSelected) => setEnable(onSelected)}
                     />
                     {
@@ -222,17 +234,17 @@ export const EngineTab = memo(({ engineType }: { engineType: ENGINE_TYPE }) => {
                             <div className="flex flex-col gap-1">
                                 <p className="m-2 text-lg">{t('selectEngine')}</p>
                                 {
-                                    isLoadingEngineList? 
-                                    <EngineSelectorLoading /> 
-                                    : 
-                                    <EngineSelector 
+                                    isLoadingEngineList?
+                                    <EngineSelectorLoading />
+                                    :
+                                    <EngineSelector
                                         engine={engine}
                                         engineList={engineList.current}
                                         onEngineChange={onEngineChange}
                                     />
                                 }
                             </div>
-                            
+
                             <div className="flex flex-col gap-1 w-full">
                                 <p className="m-2 text-lg">{t('engineConfig')}</p>
                                 <div className="flex flex-col gap-1">

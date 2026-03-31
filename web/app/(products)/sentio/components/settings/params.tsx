@@ -1,11 +1,12 @@
-import { memo, use } from 'react';
-import { EngineParamDesc, PARAM_TYPE } from '@/lib/protocol';
+import { ValueSlider } from "@/components/slider/valueSlider";
+import { EngineParamDesc, PARAM_TYPE, VoiceDesc } from '@/lib/protocol';
 import {
     Autocomplete,
     AutocompleteItem,
     Input,
     Skeleton
 } from "@heroui/react";
+import { memo } from 'react';
 import VoiceSelector from "../selector/voiceSelector";
 
 export function ParamsLoading() {
@@ -25,11 +26,11 @@ export function ParamsLoading() {
 }
 
 export const ParamsList = memo(({
-    params, 
+    params,
     settings,
     setSettings
 }: {
-    params: EngineParamDesc[], 
+    params: EngineParamDesc[],
     settings: {[key: string]: any},
     setSettings: (settings: { [key: string]: any }) => void
 }) => {
@@ -40,11 +41,12 @@ export const ParamsList = memo(({
                     switch (config.type) {
                         // 字符串类型
                         case PARAM_TYPE.STRING:
-                            if (config.choices.length > 0) {
+                            // 增加安全校验：确保 choices 存在且长度大于 0
+                            if (config.choices?.length > 0) {
                                 // 可选字符串类型
                                 return (
                                     config.name == 'voice' ?
-                                    <VoiceSelector 
+                                    <VoiceSelector
                                         name={config.name}
                                         key={config.name}
                                         description={config.description}
@@ -69,6 +71,7 @@ export const ParamsList = memo(({
                                         }
                                     >
                                         {
+                                            // 增加安全校验
                                             config.choices.map((choice) => (
                                                 <AutocompleteItem key={choice as string}>{choice}</AutocompleteItem>
                                             ))
@@ -85,7 +88,7 @@ export const ParamsList = memo(({
                                         key={config.name}
                                         required={config.required}
                                         placeholder={config.description}
-                                        value={settings[config.name] as string}
+                                        value={settings[config.name] as string || ""} // 增加默认值防报错
                                         onValueChange={
                                             (value) => {
                                                 setSettings({ ...settings, [config.name]: value as string })
@@ -94,16 +97,16 @@ export const ParamsList = memo(({
                                     />
                                 )
                             }
-                        // 整数类型
+                        // 整数或浮点数类型
                         case PARAM_TYPE.INT:
                         case PARAM_TYPE.FLOAT:
-                            // 范围选择
-                            if (config.range.length > 0) {
+                            // 增加安全校验：确保 range 存在且长度大于 0
+                            if (config.range?.length > 0) {
                                 return (
                                     <ValueSlider
                                         label={config.name}
                                         description={config.description}
-                                        key={config.description}
+                                        key={config.name} // 修复 key，最好用 name 而不是 description
                                         minValue={config.range[0] as number}
                                         maxValue={config.range[1] as number}
                                         defaultValue={config.default as number}
@@ -116,8 +119,8 @@ export const ParamsList = memo(({
                                     />
                                 )
                             }
-                            // 可选数值
-                            if (config.choices.length > 0) {
+                            // 增加安全校验：确保 choices 存在且长度大于 0
+                            if (config.choices?.length > 0) {
                                 return (
                                     <Autocomplete
                                         className="max-w-xs"
@@ -127,7 +130,7 @@ export const ParamsList = memo(({
                                         key={config.name}
                                         required={config.required}
                                         placeholder={config.description}
-                                        selectedKey={settings[config.name] as string}
+                                        selectedKey={String(settings[config.name])} // 确保转为字符串处理
                                         onSelectionChange={
                                             (e: any) => {
                                                 setSettings({ ...settings, [config.name]: e as string })
@@ -136,15 +139,18 @@ export const ParamsList = memo(({
                                     >
                                         {
                                             config.choices.map((choice) => (
-                                                <AutocompleteItem key={choice as string}>{choice}</AutocompleteItem>
+                                                <AutocompleteItem key={String(choice)}>{String(choice)}</AutocompleteItem>
                                             ))
                                         }
                                     </Autocomplete>
                                 )
                             }
+                            return null; // 如果既没有 range 也没有 choices，返回 null
                         // TODO: 布尔类型
                         case PARAM_TYPE.BOOL:
-                            return;
+                            return null;
+                        default:
+                            return null;
                     }
                 })
             }

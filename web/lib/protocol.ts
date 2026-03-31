@@ -103,6 +103,7 @@ export interface EngineDefaultResponse extends BaseResponse {
 
 export interface VoiceDesc {
     name: string;
+    display_name?: string;
     gender: GENDER_TYPE;
 }
 
