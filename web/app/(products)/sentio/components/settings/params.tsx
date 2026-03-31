@@ -7,7 +7,6 @@ import {
     Skeleton
 } from "@heroui/react";
 import VoiceSelector from "../selector/voiceSelector";
-import { ValueSlider } from "@/components/slider/valueSlider";
 
 export function ParamsLoading() {
     return (
