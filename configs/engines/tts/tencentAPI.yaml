@@ -9,12 +9,20 @@ META: {
 }
 PARAMETERS: [
   {
+    name: "app_id",
+    description: "tencent app_id.",
+    type: "string",
+    required: true,
+    choices: [],
+    default: "YOUR_APP_ID_HERE"
+  },
+  {
     name: "secret_id",
     description: "tencent secret_id.",
     type: "string",
     required: false,
     choices: [],
-    default: ""
+    default: "YOUR_SECRET_ID_HERE"
   },
   {
     name: "secret_key",
@@ -22,7 +30,7 @@ PARAMETERS: [
     type: "string",
     required: false,
     choices: [],
-    default: ""
+    default: "YOUR_SECRET_KEY_HERE"
   },
   {
     name: "voice",
