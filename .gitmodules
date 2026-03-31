@@ -1,0 +1,3 @@
+[submodule "go-backend"]
+	path = go-backend
+	url = https://github.com/cibeiwanjia/human-live2-go-backend.git
